@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/questly/',  // Add this line for GitHub Pages
   server: {
     port: 5173,
     strictPort: true,
