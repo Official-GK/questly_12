@@ -1,28 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
-import { useToast } from "@/components/ui/use-toast";
-import { Bot, Youtube, CheckCircle2, XCircle } from 'lucide-react';
+import { QuizQuestion, QuizAttempt } from '@/types/quiz';
+import { useAuth } from '@/contexts/AuthContext';
+import { updateQuizProgress } from '@/services/userService';
+import { Timer, AlertTriangle } from 'lucide-react';
 import { generateQuizFromYouTube } from '@/lib/gemini';
 import { useNavigate } from 'react-router-dom';
-
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  explanation: string;
-}
+import { saveQuizAttempt } from '@/services/quizService';
+import { Bot, Youtube, CheckCircle2, XCircle } from 'lucide-react';
+import { QuizResults } from '@/components/quiz/QuizResults';
 
 const Quiz = () => {
   const navigate = useNavigate();
+  const { currentUser, userProfile } = useAuth();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [currentAttempt, setCurrentAttempt] = useState<QuizAttempt | null>(null);
   const { toast } = useToast();
 
   // Load stored quiz on component mount
@@ -33,7 +36,8 @@ const Quiz = () => {
         const parsedQuiz = JSON.parse(storedQuiz);
         if (Array.isArray(parsedQuiz) && parsedQuiz.length > 0) {
           setQuestions(parsedQuiz);
-          localStorage.removeItem('youtubeQuiz'); // Clear stored quiz
+          setStartTime(Date.now());
+          localStorage.removeItem('youtubeQuiz');
           return;
         }
       } catch (error) {
@@ -45,230 +49,261 @@ const Quiz = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clean up the URL first
-    const cleanUrl = url.trim();
-    
-    // More comprehensive URL validation
-    try {
-      const urlObj = new URL(cleanUrl);
-      if (!urlObj.hostname.includes('youtube.com') && !urlObj.hostname.includes('youtu.be')) {
-        toast({
-          title: "Invalid URL",
-          description: "Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)",
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch (error) {
+    if (!currentUser) {
       toast({
-        title: "Invalid URL",
-        description: "Please enter a complete URL including https:// or http://",
-        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please sign in to generate quizzes.",
+        variant: "destructive"
       });
       return;
     }
 
-    try {
-      setLoading(true);
-      console.log('Generating quiz for URL:', cleanUrl);
-      const quiz = await generateQuizFromYouTube(cleanUrl);
-      
-      if (!quiz || !Array.isArray(quiz) || quiz.length === 0) {
-        throw new Error('Failed to generate quiz questions');
-      }
-      
-      setQuestions(quiz);
-      setCurrentQuestion(0);
-      setScore(0);
-      setShowResult(false);
-      setSelectedAnswer(null);
-      
+    const cleanUrl = url.trim();
+    if (!cleanUrl) {
       toast({
-        title: "Success!",
-        description: "Quiz generated successfully. Good luck!",
+        title: "URL Required",
+        description: "Please enter a valid YouTube URL",
+        variant: "destructive"
       });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const generatedQuestions = await generateQuizFromYouTube(cleanUrl);
+      setQuestions(generatedQuestions);
+      setStartTime(Date.now());
+      setLoading(false);
     } catch (error) {
       console.error('Error generating quiz:', error);
-      let errorMessage = "Failed to generate quiz. Please try again.";
-      
-      if (error instanceof Error) {
-        // Handle specific error cases
-        if (error.message.includes('Invalid YouTube video ID')) {
-          errorMessage = "Please check your YouTube URL and try again.";
-        } else if (error.message.includes('quota exceeded')) {
-          errorMessage = "YouTube API quota exceeded. Please try again later.";
-        } else if (error.message.includes('API key')) {
-          errorMessage = "API configuration error. Please contact support.";
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
       toast({
         title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+        description: "Failed to generate quiz. Please try again.",
+        variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
   };
 
-  const handleAnswer = (answer: string) => {
+  const handleAnswerSelect = (answer: string) => {
     setSelectedAnswer(answer);
-    if (answer === questions[currentQuestion].correctAnswer) {
-      setScore(score + 1);
-    }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (!selectedAnswer) return;
+
+    const currentQ = questions[currentQuestion];
+    const isCorrect = selectedAnswer === currentQ.correctAnswer;
+    
+    if (isCorrect) {
+      setScore(prev => prev + 1);
+    }
+
     if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+      setCurrentQuestion(prev => prev + 1);
       setSelectedAnswer(null);
     } else {
-      setShowResult(true);
+      // Quiz complete
+      const endTime = Date.now();
+      const totalTime = Math.floor((endTime - (startTime || endTime)) / 1000);
+      
+      const attempt: QuizAttempt = {
+        id: `${currentUser?.uid}-${Date.now()}`,
+        userId: currentUser?.uid || '',
+        timestamp: new Date().toISOString(),
+        timeTaken: totalTime,
+        score: score + (isCorrect ? 1 : 0),
+        totalQuestions: questions.length,
+        correctAnswers: score + (isCorrect ? 1 : 0),
+        answers: questions.map((q, i) => ({
+          questionIndex: i,
+          question: q,
+          userAnswer: i === currentQuestion ? selectedAnswer : '',
+          isCorrect: i === currentQuestion ? isCorrect : false
+        }))
+      };
+
+      try {
+        await saveQuizAttempt(attempt);
+        setCurrentAttempt(attempt);
+        setShowResult(true);
+      } catch (error) {
+        console.error('Error saving quiz attempt:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save quiz results",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const handleTryAgain = () => {
-    navigate('/flashcards');
-  };
-
-  // Show loading state while questions are being loaded
-  if (loading) {
+  // Show results if quiz complete
+  if (showResult && currentAttempt) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-neon-purple to-black p-4 flex items-center justify-center">
-        <Card className="p-6 bg-black/40 border-emerald-500/20">
-          <div className="flex items-center space-x-2">
-            <Bot className="w-6 h-6 animate-spin text-emerald-500" />
-            <span className="text-white">Loading quiz...</span>
-          </div>
-        </Card>
+      <div className="container py-8 space-y-8">
+        <QuizResults
+          questions={questions}
+          score={score}
+          totalTime={startTime ? Math.floor((Date.now() - startTime) / 1000) : 0}
+          attempt={currentAttempt}
+          onTryAgain={() => {
+            setQuestions([]);
+            setCurrentQuestion(0);
+            setSelectedAnswer(null);
+            setScore(0);
+            setShowResult(false);
+            setStartTime(null);
+            setCurrentAttempt(null);
+          }}
+        />
       </div>
     );
   }
 
+  // Show quiz interface
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neon-purple to-black p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-2 text-center">AI Video Quiz</h1>
-        <p className="text-zinc-400 text-center mb-8">
-          Test your knowledge from the video content
-        </p>
+    <div className="container py-8 space-y-8">
+      {!questions.length ? (
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-4xl font-bold text-white">AI Video Quiz</h1>
+            <p className="text-[#B3B3B3]">Test your knowledge from the video content</p>
+          </div>
 
-        {!questions.length ? (
-          <Card className="p-6 bg-black/40 border-emerald-500/20">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex space-x-2">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="relative">
+              <div className="relative flex items-center">
                 <Input
-                  type="url"
+                  type="text"
+                  placeholder="Paste YouTube URL here..."
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="Paste YouTube URL here..."
-                  className="flex-1 bg-black/40 border-emerald-500/20 text-zinc-200 placeholder:text-zinc-500"
+                  className="w-full pr-32 bg-[#1E1E1E] border-[#333333] text-white placeholder-[#666666]"
                 />
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="bg-emerald-500 text-black hover:bg-emerald-600"
+                <Button
+                  type="submit"
+                  disabled={loading || !url}
+                  className="absolute right-0 bg-emerald-500 hover:bg-emerald-600 text-white"
                 >
-                  {loading ? (
-                    <>
-                      <Bot className="w-5 h-5 animate-spin mr-2" />
-                      Analyzing Video...
-                    </>
-                  ) : (
-                    <>
-                      <Youtube className="w-5 h-5 mr-2" />
-                      Create Quiz
-                    </>
-                  )}
+                  <Youtube className="w-4 h-4 mr-2" />
+                  Generate Quiz
                 </Button>
               </div>
-            </form>
-          </Card>
-        ) : showResult ? (
-          <Card className="p-6 bg-black/40 border-emerald-500/20">
-            <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold text-white">Quiz Complete!</h2>
-              <p className="text-zinc-400">
-                Your score: {score} out of {questions.length}
-              </p>
+              <div className="absolute inset-0 rounded-lg transition-opacity duration-500" 
+                style={{ 
+                  boxShadow: "0 0 15px rgba(16,185,129,0.1)",
+                  pointerEvents: "none",
+                  opacity: loading ? 1 : 0
+                }} 
+              />
+            </div>
+
+            {loading && (
+              <div className="flex items-center justify-center p-8">
+                <Bot className="w-8 h-8 text-emerald-500 animate-bounce" />
+                <p className="ml-3 text-[#B3B3B3]">Generating quiz questions...</p>
+              </div>
+            )}
+          </form>
+
+          {/* Recent Attempts Section */}
+          {userProfile?.recentQuizAttempts && userProfile.recentQuizAttempts.length > 0 && (
+            <div className="mt-12 space-y-4">
+              <h2 className="text-2xl font-semibold text-white">Recent Attempts</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {userProfile.recentQuizAttempts.map((attempt, index) => (
+                  <div
+                    key={index}
+                    className="p-6 rounded-lg bg-[#1E1E1E] border border-[#333333] hover:border-emerald-500/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="space-y-1">
+                        <h3 className="font-medium text-white truncate">
+                          {attempt.videoTitle || "YouTube Video Quiz"}
+                        </h3>
+                        <p className="text-sm text-[#B3B3B3]">
+                          Score: {attempt.score}/{attempt.totalQuestions}
+                        </p>
+                      </div>
+                      {attempt.score / attempt.totalQuestions >= 0.7 ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-500" />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Progress
+                        value={(attempt.score / attempt.totalQuestions) * 100}
+                        className="h-2"
+                        indicatorClassName={
+                          attempt.score / attempt.totalQuestions >= 0.7
+                            ? "bg-emerald-500"
+                            : "bg-red-500"
+                        }
+                      />
+                      <div className="flex justify-between text-xs text-[#B3B3B3]">
+                        <span>Completed {new Date(attempt.completedAt).toLocaleDateString()}</span>
+                        <span>{Math.round((attempt.score / attempt.totalQuestions) * 100)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="max-w-3xl mx-auto">
+          <div className="mb-8 space-y-2">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-white">Question {currentQuestion + 1} of {questions.length}</h2>
+              <div className="flex items-center text-[#B3B3B3]">
+                <Timer className="w-4 h-4 mr-2" />
+                <span>{startTime ? Math.floor((Date.now() - startTime) / 1000) : 0}s</span>
+              </div>
+            </div>
+            <Progress 
+              value={((currentQuestion + 1) / questions.length) * 100} 
+              className="h-2"
+              indicatorClassName="bg-emerald-500"
+            />
+          </div>
+
+          <div className="space-y-6">
+            <Card className="p-6 bg-[#1E1E1E] border-[#333333]">
+              <h3 className="text-xl font-medium text-white mb-4">
+                {questions[currentQuestion].question}
+              </h3>
+              <div className="space-y-3">
+                {questions[currentQuestion].options.map((option, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedAnswer(option)}
+                    className={`w-full p-4 text-left rounded-lg border transition-all ${
+                      selectedAnswer === option
+                        ? "border-emerald-500 bg-emerald-500/10 text-white"
+                        : "border-[#333333] hover:border-emerald-500/50 text-[#B3B3B3] hover:text-white"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            <div className="flex justify-end">
               <Button
-                onClick={handleTryAgain}
-                className="bg-emerald-500 text-black hover:bg-emerald-600"
+                onClick={handleNext}
+                disabled={!selectedAnswer}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
               >
-                Back to Flashcards
+                {currentQuestion === questions.length - 1 ? "Finish Quiz" : "Next Question"}
               </Button>
             </div>
-          </Card>
-        ) : (
-          <Card className="p-6 bg-black/40 border-emerald-500/20">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-400">
-                  Question {currentQuestion + 1} of {questions.length}
-                </span>
-                <span className="text-zinc-400">
-                  Score: {score}
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                <h2 className="text-xl text-white font-semibold">
-                  {questions[currentQuestion].question}
-                </h2>
-
-                <div className="grid grid-cols-1 gap-3">
-                  {questions[currentQuestion].options.map((option, index) => (
-                    <Button
-                      key={index}
-                      onClick={() => handleAnswer(option)}
-                      disabled={selectedAnswer !== null}
-                      className={`justify-start text-left p-4 h-auto ${
-                        selectedAnswer === option
-                          ? option === questions[currentQuestion].correctAnswer
-                            ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                            : 'bg-red-500/20 border-red-500/40 text-red-400'
-                          : selectedAnswer !== null && option === questions[currentQuestion].correctAnswer
-                            ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                            : 'bg-black/40 border-emerald-500/20 text-zinc-200'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        {selectedAnswer === option ? (
-                          option === questions[currentQuestion].correctAnswer ? (
-                            <CheckCircle2 className="w-5 h-5" />
-                          ) : (
-                            <XCircle className="w-5 h-5" />
-                          )
-                        ) : selectedAnswer !== null && option === questions[currentQuestion].correctAnswer ? (
-                          <CheckCircle2 className="w-5 h-5" />
-                        ) : null}
-                        <span>{option}</span>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-
-                {selectedAnswer && (
-                  <>
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400">
-                      <p className="text-sm">{questions[currentQuestion].explanation}</p>
-                    </div>
-                    <Button
-                      onClick={handleNext}
-                      className="w-full bg-emerald-500 text-black hover:bg-emerald-600"
-                    >
-                      {currentQuestion < questions.length - 1 ? 'Next Question' : 'Show Results'}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

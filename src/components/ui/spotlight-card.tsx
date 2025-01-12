@@ -1,16 +1,17 @@
-import { useRef, useState } from "react";
+import { useRef, useState, forwardRef } from "react";
+import { cn } from "@/lib/utils";
 
-interface SpotlightCardProps {
-  children: React.ReactNode;
-  className?: string;
+interface SpotlightCardProps extends React.HTMLAttributes<HTMLDivElement> {
   spotlightColor?: string;
 }
 
-export const SpotlightCard = ({ 
-  children, 
-  className = "", 
-  spotlightColor = "rgba(255, 77, 0, 0.15)"
-}: SpotlightCardProps) => {
+export const SpotlightCard = forwardRef<HTMLDivElement, SpotlightCardProps>(({
+  children,
+  className = "",
+  spotlightColor = "rgba(29, 185, 84, 0.25)", // Spotify green with opacity
+  style,
+  ...props
+}, ref) => {
   const divRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -43,22 +44,43 @@ export const SpotlightCard = ({
 
   return (
     <div
-      ref={divRef}
+      ref={ref}
       onMouseMove={handleMouseMove}
       onFocus={handleFocus}
       onBlur={handleBlur}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${className}`}
+      className={cn(
+        "group relative overflow-hidden rounded-xl border bg-card p-6 transition-colors hover:bg-muted/50",
+        className
+      )}
+      style={{
+        ...style,
+        "--spotlight-color": spotlightColor,
+        "--spotlight-x": `${position.x}px`,
+        "--spotlight-y": `${position.y}px`,
+        "--spotlight-opacity": opacity,
+      } as React.CSSProperties}
+      {...props}
     >
+      {/* Spotlight effect */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out"
+        className="pointer-events-none absolute inset-0 transition-opacity duration-300"
         style={{
-          opacity,
-          background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`,
+          background: `radial-gradient(600px circle at var(--spotlight-x) var(--spotlight-y), var(--spotlight-color), transparent 40%)`,
+          opacity: "var(--spotlight-opacity)",
         }}
       />
-      {children}
+      
+      {/* Content */}
+      <div className="relative z-10">{children}</div>
+
+      {/* Hover border effect */}
+      <div className="absolute inset-0 rounded-xl transition-opacity duration-500 group-hover:opacity-100 opacity-0" 
+           style={{ 
+             boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.1)" 
+           }} 
+      />
     </div>
   );
-}; 
+});

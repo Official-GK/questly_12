@@ -1,261 +1,267 @@
-import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Flame, Medal, Star, Trophy, Target, Brain, Zap, Award, Crown, Clock, BookOpen } from "lucide-react";
+import { LevelProgressCard } from "@/components/dashboard/LevelProgressCard";
+import { DailyChallengesCard } from "@/components/dashboard/DailyChallengesCard";
+import { LearningStreakCard } from "@/components/dashboard/LearningStreakCard";
+import { StatsCard } from "@/components/dashboard/StatsCard";
+import { LearningTools } from "@/components/dashboard/LearningTools";
+import { LeaderboardCard } from "@/components/dashboard/LeaderboardCard";
+import { GradientCard } from "@/components/ui/gradient-card";
+import { Badge } from "@/components/ui/badge";
+import { ChittiAI } from "@/components/ChittiAI";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { BookOpen, Trophy, Clock, Star, Activity } from "lucide-react";
-import { SpotlightCard } from "@/components/ui/spotlight-card";
-import { Link } from "react-router-dom";
-import { Zap, Bot, Youtube } from "lucide-react";
 
-interface Course {
-  id: number;
-  title: string;
-  progress: number;
-  totalQuizzes: number;
-  completedQuizzes: number;
-  lastAccessed: string;
-  category: string;
-  route: string;
-}
+const courses = [
+  {
+    id: 1,
+    title: "Web Development Fundamentals",
+    description: "Learn the basics of web development, including HTML, CSS, and JavaScript.",
+    progress: 0,
+    image: "https://images.unsplash.com/photo-1547658719-da2b51169166?auto=format&fit=crop&w=800&q=80",
+    path: "/courses/web-development",
+    chapters: 4,
+    duration: "8 hours",
+    xp: 2600
+  },
+  {
+    id: 2,
+    title: "Data Structures and Algorithms",
+    description: "Master the fundamental data structures and algorithms.",
+    progress: 0,
+    image: "https://images.unsplash.com/photo-1516116216624-53e697fedbea?auto=format&fit=crop&w=800&q=80",
+    path: "/courses/data-structures-and-algorithms",
+    chapters: 4,
+    duration: "10 hours",
+    xp: 2600
+  },
+  {
+    id: 3,
+    title: "Machine Learning Basics",
+    description: "Introduction to machine learning concepts and algorithms.",
+    progress: 0,
+    image: "https://images.unsplash.com/photo-1527430253228-e93688616381?auto=format&fit=crop&w=800&q=80",
+    path: "/courses/machine-learning-basics",
+    chapters: 4,
+    duration: "12 hours",
+    xp: 2600
+  },
+  {
+    id: 4,
+    title: "System Design",
+    description: "Learn how to design scalable systems and architectures.",
+    progress: 0,
+    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80",
+    path: "/courses/system-design",
+    chapters: 4,
+    duration: "10 hours",
+    xp: 2600
+  }
+];
 
-const Dashboard = () => {
+function CourseCard({ course, className }: { course: typeof courses[0], className?: string }) {
   const navigate = useNavigate();
-  const [courses] = useState<Course[]>([
-    {
-      id: 1,
-      title: "Introduction to React",
-      progress: 75,
-      totalQuizzes: 10,
-      completedQuizzes: 7,
-      lastAccessed: "2 hours ago",
-      category: "Web Development",
-      route: "/course/react-intro"
-    },
-    {
-      id: 2,
-      title: "Advanced JavaScript",
-      progress: 45,
-      totalQuizzes: 12,
-      completedQuizzes: 5,
-      lastAccessed: "1 day ago",
-      category: "Programming",
-      route: "/course/advanced-javascript"
-    },
-    {
-      id: 3,
-      title: "UI/UX Design Basics",
-      progress: 90,
-      totalQuizzes: 8,
-      completedQuizzes: 7,
-      lastAccessed: "3 days ago",
-      category: "Design",
-      route: "/course/uiux-basics"
-    },
-    {
-      id: 4,
-      title: "Python for Data Science",
-      progress: 60,
-      totalQuizzes: 15,
-      completedQuizzes: 9,
-      lastAccessed: "4 hours ago",
-      category: "Data Science",
-      route: "/course/python-data-science"
-    },
-    {
-      id: 5,
-      title: "Machine Learning Fundamentals",
-      progress: 30,
-      totalQuizzes: 20,
-      completedQuizzes: 6,
-      lastAccessed: "1 week ago",
-      category: "Artificial Intelligence",
-      route: "/course/machine-learning"
-    },
-    {
-      id: 6,
-      title: "Mobile App Development",
-      progress: 85,
-      totalQuizzes: 12,
-      completedQuizzes: 10,
-      lastAccessed: "5 days ago",
-      category: "Mobile Development",
-      route: "/course/mobile-dev"
-    },
-    {
-      id: 7,
-      title: "Cloud Computing Essentials",
-      progress: 40,
-      totalQuizzes: 14,
-      completedQuizzes: 6,
-      lastAccessed: "2 days ago",
-      category: "Cloud Computing",
-      route: "/course/cloud-computing"
-    },
-    {
-      id: 8,
-      title: "Cybersecurity Basics",
-      progress: 70,
-      totalQuizzes: 16,
-      completedQuizzes: 11,
-      lastAccessed: "6 hours ago",
-      category: "Security",
-      route: "/course/cybersecurity"
-    },
-    {
-      id: 9,
-      title: "Database Management",
-      progress: 55,
-      totalQuizzes: 10,
-      completedQuizzes: 6,
-      lastAccessed: "3 days ago",
-      category: "Database",
-      route: "/course/database-management"
-    }
-  ]);
+
+  const handleClick = () => {
+    navigate(course.path);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neon-purple to-black p-4">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <h1 className="text-3xl font-bold text-white text-center">
-          Your Learning Dashboard
-        </h1>
-
-        {/* Achievement Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-6 bg-black/40 border-emerald-500/20 flex items-center space-x-4">
-            <div className="h-12 w-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
-              <Trophy className="h-6 w-6 text-yellow-500" />
+    <GradientCard 
+      theme="teal" 
+      className={cn("group h-full cursor-pointer transition-all hover:scale-[1.02]", className)}
+      onClick={handleClick}
+    >
+      <div className="flex h-full flex-col gap-4">
+        {/* Course Image */}
+        <div className="relative h-48 overflow-hidden rounded-lg">
+          <img
+            src={course.image}
+            alt={course.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          {course.progress > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#1E1E1E]">
+              <div 
+                className="h-full bg-gradient-to-r from-[#2DD4BF] to-[#14B8A6]" 
+                style={{ width: `${course.progress}%` }}
+              />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Badges</h3>
-              <p className="text-zinc-400">5 Earned</p>
-            </div>
-          </Card>
-
-          <Card className="p-6 bg-black/40 border-emerald-500/20 flex items-center space-x-4">
-            <div className="h-12 w-12 rounded-full bg-purple-500/20 flex items-center justify-center">
-              <Star className="h-6 w-6 text-purple-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Achievements</h3>
-              <p className="text-zinc-400">3 Unlocked</p>
-            </div>
-          </Card>
-
-          <Card className="p-6 bg-black/40 border-emerald-500/20 flex items-center space-x-4">
-            <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <Zap className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Level</h3>
-              <p className="text-zinc-400">XP: 750/1000</p>
-            </div>
-          </Card>
+          )}
         </div>
 
-        {/* Progress Bar */}
-        <Card className="p-6 bg-black/40 border-emerald-500/20">
+        {/* Course Content */}
+        <div className="flex flex-1 flex-col gap-4">
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">Current Level Progress</span>
-              <span className="text-zinc-400">75%</span>
+            <h3 className="text-xl font-semibold text-white">{course.title}</h3>
+            <p className="text-sm text-[#B3B3B3]">{course.description}</p>
+          </div>
+
+          {/* Course Stats */}
+          <div className="mt-auto flex items-center gap-4">
+            <div className="flex items-center gap-1 text-sm text-[#B3B3B3]">
+              <BookOpen className="h-4 w-4" />
+              <span>{course.chapters} chapters</span>
             </div>
-            <div className="h-2 bg-black/40 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full" style={{ width: '75%' }} />
+            <div className="flex items-center gap-1 text-sm text-[#B3B3B3]">
+              <Clock className="h-4 w-4" />
+              <span>{course.duration}</span>
+            </div>
+            <div className="ml-auto flex items-center gap-1 rounded-full bg-[#2DD4BF]/20 px-2 py-1 text-sm text-[#2DD4BF]">
+              <Zap className="h-4 w-4" />
+              <span>+{course.xp} XP</span>
             </div>
           </div>
-        </Card>
+        </div>
+      </div>
+    </GradientCard>
+  );
+}
 
-        {/* Recent Activity */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">Recent Activity</h2>
-          <Card className="p-6 bg-black/40 border-emerald-500/20">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <Bot className="h-5 w-5 text-emerald-500" />
-                </div>
-                <div>
-                  <h3 className="text-white">Completed AI Summary</h3>
-                  <p className="text-zinc-400 text-sm">2 hours ago</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <Youtube className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="text-white">Finished Video Quiz</h3>
-                  <p className="text-zinc-400 text-sm">5 hours ago</p>
-                </div>
-              </div>
-            </div>
-          </Card>
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const currentXP = 0;
+  const currentLevel = 0;
+  const streak = 0;
+  const coursesCompleted = 0;
+  const dailyGoal = 100;
+
+  const handleViewAllCourses = () => {
+    navigate('/courses');
+  };
+
+  return (
+    <div className="container space-y-8 py-8">
+      {/* Welcome Message */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName}!</h2>
+          <p className="text-[#B3B3B3]">
+            Track your progress and keep learning
+          </p>
+        </div>
+        <ChittiAI position="top-right" className="relative h-10 w-10 top-0 right-0" />
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title="Total XP"
+          value={currentXP}
+          subtitle="Experience Points"
+          icon={Trophy}
+          theme="green"
+        />
+        <StatsCard
+          title="Daily Streak"
+          value={streak}
+          subtitle="Days"
+          icon={Flame}
+          theme="orange"
+        />
+        <StatsCard
+          title="Courses Completed"
+          value={coursesCompleted}
+          subtitle="Courses"
+          icon={Medal}
+          theme="purple"
+        />
+        <StatsCard
+          title="Daily Goal"
+          value={`${Math.min(currentXP, dailyGoal)}/${dailyGoal}`}
+          subtitle="XP Today"
+          icon={Target}
+          theme="blue"
+        />
+      </div>
+
+      {/* Learning Tools Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold text-white">Learning Tools</h2>
+          <p className="text-[#B3B3B3]">Choose your learning method</p>
+        </div>
+        <LearningTools />
+      </div>
+
+      {/* Progress and Leaderboard */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <LevelProgressCard
+          currentXP={currentXP}
+          requiredXP={1000}
+          level={currentLevel}
+          className="w-full"
+        />
+        <LeaderboardCard />
+      </div>
+
+      {/* Daily Challenges and Learning Streak */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DailyChallengesCard
+          challenges={[
+            {
+              title: "Complete Python Basics",
+              description: "Finish Chapter 1 of Python course",
+              xpReward: 200,
+              progress: 75,
+              timeLeft: "2 hours left",
+            },
+            {
+              title: "Daily Quiz Challenge",
+              description: "Score 80% or higher on today's quiz",
+              xpReward: 150,
+              completed: true,
+            },
+            {
+              title: "Practice Problems",
+              description: "Complete 5 practice problems",
+              xpReward: 300,
+            },
+          ]}
+          completedCount={3}
+          totalCount={5}
+          className="w-full"
+        />
+        <LearningStreakCard
+          currentStreak={streak}
+          longestStreak={streak}
+          weekActivity={[
+            { day: "Mon", active: false },
+            { day: "Tue", active: false },
+            { day: "Wed", active: true },
+            { day: "Thu", active: true },
+            { day: "Fri", active: true },
+            { day: "Sat", active: false },
+            { day: "Sun", active: true },
+          ]}
+          className="w-full"
+        />
+      </div>
+
+      {/* Featured Courses */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Featured Courses</h2>
+            <p className="text-[#B3B3B3]">Continue learning with these recommended courses</p>
+          </div>
+          <Badge 
+            variant="outline" 
+            className="cursor-pointer hover:bg-[#2DD4BF]/10"
+            onClick={handleViewAllCourses}
+          >
+            View All
+          </Badge>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link to="/summary">
-            <Card className="p-6 bg-black/40 border-emerald-500/20 hover:bg-black/60 transition-colors">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <Bot className="h-6 w-6 text-emerald-500" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Create Summary</h3>
-                  <p className="text-zinc-400">Generate a new AI summary</p>
-                </div>
-              </div>
-            </Card>
-          </Link>
-
-          <Link to="/quiz">
-            <Card className="p-6 bg-black/40 border-emerald-500/20 hover:bg-black/60 transition-colors">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <Youtube className="h-6 w-6 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Take Quiz</h3>
-                  <p className="text-zinc-400">Start a new video quiz</p>
-                </div>
-              </div>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Course Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {courses.map((course) => (
-            <div 
-              key={course.id}
-              onClick={() => navigate(course.route)}
-              className="cursor-pointer"
-            >
-              <SpotlightCard className="transform transition-all duration-300 hover:scale-105">
-                <CardHeader>
-                  <CardTitle className="text-xl text-emerald-400">{course.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center text-sm text-zinc-400">
-                    <span>{course.category}</span>
-                    <span>{course.lastAccessed}</span>
-                  </div>
-                  <Progress value={course.progress} className="h-2" />
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-400">{course.progress}% Complete</span>
-                    <span className="text-zinc-400">
-                      {course.completedQuizzes}/{course.totalQuizzes} Quizzes
-                    </span>
-                  </div>
-                </CardContent>
-              </SpotlightCard>
-            </div>
+            <CourseCard key={course.id} course={course} />
           ))}
         </div>
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}

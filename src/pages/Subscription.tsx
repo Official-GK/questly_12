@@ -4,27 +4,36 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
+import { loadStripe } from "@stripe/stripe-js";
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 const plans = [
   {
+    id: "price_basic",
     name: "Basic",
     price: "$0",
+    priceId: "free_tier",
     description: "Perfect for getting started",
     features: ["5 quizzes per month", "Basic analytics", "Community support"],
     icon: CreditCard,
     popular: false,
   },
   {
+    id: "price_premium",
     name: "Premium",
     price: "$15",
+    priceId: "price_premium",
     description: "Great for regular learners",
     features: ["Unlimited quizzes", "Detailed analytics", "Priority support", "Ad-free experience"],
     icon: Star,
     popular: true,
   },
   {
+    id: "price_pro",
     name: "Pro",
     price: "$30",
+    priceId: "price_pro",
     description: "For professional educators",
     features: [
       "Everything in Premium",
@@ -40,14 +49,60 @@ const plans = [
 
 const Subscription = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleSubscribe = (planName: string) => {
-    setSelectedPlan(planName);
-    toast({
-      title: "Subscription Updated",
-      description: `You've selected the ${planName} plan. This is a demo - no actual subscription was processed.`,
-    });
+  const handleSubscribe = async (plan: typeof plans[0]) => {
+    try {
+      setLoading(plan.id);
+      
+      if (plan.priceId === 'free_tier') {
+        toast({
+          title: "Free Plan Selected",
+          description: "You're now on the Basic plan. Enjoy!",
+        });
+        setSelectedPlan(plan.name);
+        return;
+      }
+
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          priceId: plan.priceId,
+          planName: plan.name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const { sessionId } = await response.json();
+      const stripe = await stripePromise;
+      
+      if (!stripe) {
+        throw new Error('Stripe failed to load');
+      }
+
+      const { error } = await stripe.redirectToCheckout({ sessionId });
+      
+      if (error) {
+        throw error;
+      }
+
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(null);
+    }
   };
 
   return (
@@ -65,7 +120,7 @@ const Subscription = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((plan) => (
             <SpotlightCard 
-              key={plan.name} 
+              key={plan.id} 
               spotlightColor="rgba(29, 185, 84, 0.15)"
             >
               <Card className={`bg-white/10 backdrop-blur-lg border-neon-orange/20 hover:border-neon-orange/40 transition-colors cursor-pointer ${
@@ -103,9 +158,19 @@ const Subscription = () => {
                         ? "bg-neon-green hover:bg-neon-green/90 text-black"
                         : "bg-white/10 hover:bg-white/20 text-white"
                     }`}
-                    onClick={() => handleSubscribe(plan.name)}
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={loading === plan.id || selectedPlan === plan.name}
                   >
-                    {selectedPlan === plan.name ? "Current Plan" : "Subscribe"}
+                    {loading === plan.id ? (
+                      <span className="flex items-center">
+                        <span className="animate-spin mr-2">⚪</span>
+                        Processing...
+                      </span>
+                    ) : selectedPlan === plan.name ? (
+                      "Current Plan"
+                    ) : (
+                      "Subscribe"
+                    )}
                   </Button>
                 </CardFooter>
               </Card>

@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Progress Collection
+    match /progress/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Mock Tests Collection
+    match /mockTests/{testId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Mock Test Attempts Collection
+    match /mockTestAttempts/{attemptId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Default rule - deny everything else
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
