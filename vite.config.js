@@ -6,13 +6,20 @@ import fs from 'fs-extra'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// https://vitejs.dev/config/
 export default defineConfig({
   base: '/questly_12/',
   plugins: [
     react(),
     {
-      name: 'copy-404',
+      name: 'copy-files',
       closeBundle: async () => {
+        // Copy .nojekyll
+        await fs.copy(
+          path.resolve(__dirname, '.nojekyll'),
+          path.resolve(__dirname, 'dist/.nojekyll')
+        )
+        // Copy 404.html
         await fs.copy(
           path.resolve(__dirname, 'public/404.html'),
           path.resolve(__dirname, 'dist/404.html')
