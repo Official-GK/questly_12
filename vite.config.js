@@ -1,8 +1,11 @@
-const { defineConfig } = require('vite')
-const react = require('@vitejs/plugin-react-swc')
-const path = require('path')
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-module.exports = defineConfig({
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
