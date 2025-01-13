@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter, useNavigate } from 'react-router-dom';
+import { HashRouter, useNavigate } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
 import '@testing-library/jest-dom';
 
@@ -17,9 +17,9 @@ describe('Dashboard Navigation', () => {
 
   it('should navigate to the correct course page when clicking a course card', () => {
     render(
-      <BrowserRouter>
+      <HashRouter>
         <Dashboard />
-      </BrowserRouter>
+      </HashRouter>
     );
 
     // Find and click the React course card
