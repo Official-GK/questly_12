@@ -232,27 +232,25 @@ export const generateFlashcardsFromYouTube = async (url: string): Promise<Flashc
     Description: ${videoDetails.description}
 
     Create 5 flashcards that test understanding of the key concepts from this video.
-    Format the response as a JSON array. Each flashcard must have:
-    - 'term': a clear question about the video content
-    - 'definition': the correct answer with explanation
-    
-    Example format:
-    [
-      {
-        "term": "What is the main topic discussed in the video?",
-        "definition": "The video primarily discusses [topic] by explaining [key points]"
-      }
-    ]`;
+    Format the response as a valid JSON array with exactly this format, no markdown or code blocks:
+    [{"term": "question here", "definition": "answer here"}]`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
     try {
-      const flashcards = JSON.parse(text);
-      if (!Array.isArray(flashcards)) {
+      // Remove any markdown code block markers if present
+      const cleanedText = text.replace(/```json\n|\n```/g, '').trim();
+      const flashcards = JSON.parse(cleanedText);
+      
+      if (!Array.isArray(flashcards) || !flashcards.every(card => 
+        typeof card === 'object' && 
+        'term' in card && 
+        'definition' in card)) {
         throw new Error('Invalid response format');
       }
+      
       return flashcards;
     } catch (error) {
       console.error('Error parsing flashcards:', error);

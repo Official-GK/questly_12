@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { CreditCard, Check, Star, Crown } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { loadStripe } from "@stripe/stripe-js";
+import { useAuth } from "@/contexts/AuthContext";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -23,7 +24,7 @@ const plans = [
     id: "price_premium",
     name: "Premium",
     price: "$15",
-    priceId: "price_premium",
+    priceId: import.meta.env.VITE_STRIPE_PREMIUM_PRICE_ID,
     description: "Great for regular learners",
     features: ["Unlimited quizzes", "Detailed analytics", "Priority support", "Ad-free experience"],
     icon: Star,
@@ -33,7 +34,7 @@ const plans = [
     id: "price_pro",
     name: "Pro",
     price: "$30",
-    priceId: "price_pro",
+    priceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID,
     description: "For professional educators",
     features: [
       "Everything in Premium",
@@ -51,8 +52,18 @@ const Subscription = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleSubscribe = async (plan: typeof plans[0]) => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please login to subscribe to a plan.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(plan.id);
       
@@ -65,19 +76,26 @@ const Subscription = () => {
         return;
       }
 
+      if (!plan.priceId) {
+        throw new Error('Invalid price ID');
+      }
+
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getIdToken()}`,
         },
         body: JSON.stringify({
           priceId: plan.priceId,
           planName: plan.name,
+          email: user.email,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        const error = await response.text();
+        throw new Error(error || 'Network response was not ok');
       }
 
       const { sessionId } = await response.json();
@@ -97,7 +115,7 @@ const Subscription = () => {
       console.error('Error:', error);
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again later.",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -106,77 +124,64 @@ const Subscription = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neon-purple to-black p-8">
-      <div className="container mx-auto max-w-6xl">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4 animate-glow">
-            Choose Your Plan
-          </h1>
-          <p className="text-white/60 text-lg">
-            Unlock your learning potential with our flexible subscription plans
-          </p>
-        </div>
+    <div className="container py-8">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Select the perfect plan for your learning journey. All plans include access to our core features.
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan) => (
-            <SpotlightCard 
-              key={plan.id} 
-              spotlightColor="rgba(29, 185, 84, 0.15)"
-            >
-              <Card className={`bg-white/10 backdrop-blur-lg border-neon-orange/20 hover:border-neon-orange/40 transition-colors cursor-pointer ${
-                plan.popular ? "border-neon-green" : ""
-              }`}>
-                <CardHeader>
-                  <div className="flex justify-center mb-4">
-                    <plan.icon className={`w-12 h-12 ${
-                      plan.popular ? "text-neon-green animate-float" : "text-white/60"
-                    }`} />
+      <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {plans.map((plan) => (
+          <SpotlightCard key={plan.id} className={plan.popular ? 'border-primary' : ''}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <plan.icon className="h-8 w-8 text-primary" />
+                {plan.popular && (
+                  <span className="px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full">
+                    Most Popular
+                  </span>
+                )}
+              </div>
+              <CardTitle className="text-2xl font-bold mt-4">{plan.name}</CardTitle>
+              <div className="mt-2">
+                <span className="text-3xl font-bold">{plan.price}</span>
+                {plan.price !== "$0" && <span className="text-muted-foreground">/month</span>}
+              </div>
+              <p className="text-muted-foreground mt-2">{plan.description}</p>
+            </CardHeader>
+            <CardContent className="mt-4">
+              <ul className="space-y-3">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button
+                className="w-full"
+                variant={plan.popular ? "default" : "outline"}
+                onClick={() => handleSubscribe(plan)}
+                disabled={loading === plan.id || selectedPlan === plan.name}
+              >
+                {loading === plan.id ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+                    Processing...
                   </div>
-                  <CardTitle className="text-2xl font-bold text-white text-center">
-                    {plan.name}
-                  </CardTitle>
-                  <div className="text-center">
-                    <span className="text-4xl font-bold text-white">{plan.price}</span>
-                    <span className="text-white/60">/month</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <p className="text-white/60 mb-6">{plan.description}</p>
-                  <ul className="space-y-4">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center text-white">
-                        <Check className="w-5 h-5 text-neon-green mr-2" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    className={`w-full ${
-                      plan.popular
-                        ? "bg-neon-green hover:bg-neon-green/90 text-black"
-                        : "bg-white/10 hover:bg-white/20 text-white"
-                    }`}
-                    onClick={() => handleSubscribe(plan)}
-                    disabled={loading === plan.id || selectedPlan === plan.name}
-                  >
-                    {loading === plan.id ? (
-                      <span className="flex items-center">
-                        <span className="animate-spin mr-2">⚪</span>
-                        Processing...
-                      </span>
-                    ) : selectedPlan === plan.name ? (
-                      "Current Plan"
-                    ) : (
-                      "Subscribe"
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </SpotlightCard>
-          ))}
-        </div>
+                ) : selectedPlan === plan.name ? (
+                  "Current Plan"
+                ) : (
+                  "Subscribe"
+                )}
+              </Button>
+            </CardFooter>
+          </SpotlightCard>
+        ))}
       </div>
     </div>
   );

@@ -11,13 +11,43 @@ interface Question {
 
 interface CourseQuizProps {
   title: string;
-  questions: Question[];
+  questions?: Question[];
   onComplete: (score: number) => void;
 }
 
-export function CourseQuiz({ title, questions, onComplete }: CourseQuizProps) {
+export function CourseQuiz({ title, questions = [], onComplete }: CourseQuizProps) {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: number]: number }>({});
   const [submitted, setSubmitted] = useState(false);
+
+  // If no questions are available
+  if (!questions || questions.length === 0) {
+    return (
+      <Card className="p-6 text-center">
+        <h2 className="text-2xl font-bold mb-2">{title}</h2>
+        <p className="text-muted-foreground">No questions available for this quiz.</p>
+      </Card>
+    );
+  }
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const handleAnswer = (answerIndex: number) => {
+    if (submitted) return;
+    setAnswers(prev => ({ ...prev, [currentQuestion.id]: answerIndex }));
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    }
+  };
 
   const handleSubmit = () => {
     setSubmitted(true);
@@ -34,57 +64,85 @@ export function CourseQuiz({ title, questions, onComplete }: CourseQuizProps) {
     return question?.correctAnswer === answerIndex;
   };
 
+  const canSubmit = Object.keys(answers).length === questions.length;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">{title}</h2>
-        <p className="text-muted-foreground">
-          Complete this quiz to move to the next video
-        </p>
-      </div>
+    <Card className="p-6">
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">{title}</h2>
+          <p className="text-muted-foreground">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </p>
+        </div>
 
-      <div className="space-y-8">
-        {questions.map((question) => (
-          <Card key={question.id} className="p-6">
-            <div className="space-y-4">
-              <h3 className="font-medium">{question.question}</h3>
-              <div className="space-y-2">
-                {question.options.map((option, index) => {
-                  const isCorrect = isAnswerCorrect(question.id, index);
-                  return (
-                    <button
-                      key={index}
-                      className={`w-full text-left p-4 rounded-lg border ${
-                        answers[question.id] === index
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary"
-                      } ${
-                        submitted
-                          ? isCorrect
-                            ? "bg-green-100 border-green-500 dark:bg-green-900/20"
-                            : answers[question.id] === index
-                            ? "bg-red-100 border-red-500 dark:bg-red-900/20"
-                            : ""
-                          : ""
-                      }`}
-                      onClick={() => !submitted && setAnswers({ ...answers, [question.id]: index })}
-                      disabled={submitted}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+        <div className="space-y-4">
+          <h3 className="font-medium">{currentQuestion.question}</h3>
+          <div className="space-y-2">
+            {currentQuestion.options.map((option, index) => {
+              const isCorrect = isAnswerCorrect(currentQuestion.id, index);
+              const isSelected = answers[currentQuestion.id] === index;
+              
+              return (
+                <button
+                  key={index}
+                  className={`w-full text-left p-4 rounded-lg border transition-colors
+                    ${isSelected ? "border-primary bg-primary/10" : "border-border hover:border-primary"}
+                    ${submitted && isSelected
+                      ? isCorrect
+                        ? "border-green-500 bg-green-50 text-green-700"
+                        : "border-red-500 bg-red-50 text-red-700"
+                      : ""
+                    }
+                    ${submitted && !isSelected && isCorrect
+                      ? "border-green-500 bg-green-50/50 text-green-700"
+                      : ""
+                    }
+                  `}
+                  onClick={() => handleAnswer(index)}
+                  disabled={submitted}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {!submitted && (
-        <Button onClick={handleSubmit} className="w-full">
-          Submit Quiz
-        </Button>
-      )}
-    </div>
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={currentQuestionIndex === 0}
+          >
+            Previous
+          </Button>
+          
+          {currentQuestionIndex === questions.length - 1 ? (
+            <Button
+              onClick={handleSubmit}
+              disabled={!canSubmit || submitted}
+            >
+              Submit Quiz
+            </Button>
+          ) : (
+            <Button
+              onClick={handleNext}
+              disabled={!answers[currentQuestion.id]}
+            >
+              Next
+            </Button>
+          )}
+        </div>
+
+        {submitted && (
+          <div className="mt-4 p-4 bg-green-50 rounded-lg">
+            <p className="text-green-700 font-medium text-center">
+              Quiz completed! Your answers have been submitted.
+            </p>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }

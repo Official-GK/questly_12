@@ -10,13 +10,10 @@ export default defineConfig({
     }
   },
   build: {
-    commonjsOptions: {
-      transformMixedEsModules: true
-    },
     rollupOptions: {
-      onwarn: (warning, warn) => {
-        if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return
-        warn(warning)
+      external: ['@/components/ui/sonner'],
+      output: {
+        manualChunks: undefined
       }
     }
   }

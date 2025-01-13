@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Bot, Brain, Youtube, Plus, Minus, ArrowRight, Sparkles, TrendingUp, BookOpen, ArrowLeft } from 'lucide-react';
+import { Bot, Brain, Youtube, Plus, Minus, ArrowRight, Sparkles, TrendingUp, BookOpen, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { generateFlashcards, generateFlashcardsFromYouTube } from '@/lib/gemini';
 import { generatePersonalizedFlashcards } from '@/lib/personalizedLearning';
 import { generateTopicRecommendations } from '@/lib/recommendationService';
@@ -355,48 +355,44 @@ const Flashcards = () => {
 
         {/* Flashcard display */}
         {flashcards.length > 0 && (
-          <div className="space-y-8">
-            <FlashCard
-              card={flashcards[currentIndex]}
-              isFlipped={isFlipped}
-              onFlip={() => setIsFlipped(!isFlipped)}
-              isPersonalized={isPersonalizedMode}
-            />
-            
-            {/* Navigation */}
-            <div className="nav-buttons">
+          <div className="mt-8">
+            <div className="flex justify-center mb-8">
+              <div className="w-full max-w-2xl">
+                <FlashCard
+                  key={`card-${currentIndex}`}
+                  card={flashcards[currentIndex]}
+                  isFlipped={isFlipped}
+                  onFlip={toggleFlip}
+                  isPersonalized={isPersonalizedMode}
+                />
+              </div>
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex justify-center gap-4 mt-4">
               <Button
-                onClick={() => {
-                  setCurrentIndex(currentIndex - 1);
-                  setIsFlipped(false);
-                }}
+                onClick={previousCard}
                 disabled={currentIndex === 0}
-                className="nav-button"
+                variant="outline"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4 mr-2" />
                 Previous
               </Button>
-              <span className="card-counter">
-                {currentIndex + 1} / {flashcards.length}
-              </span>
               <Button
-                onClick={() => {
-                  setCurrentIndex(currentIndex + 1);
-                  setIsFlipped(false);
-                }}
+                onClick={nextCard}
                 disabled={currentIndex === flashcards.length - 1}
-                className="nav-button"
+                variant="outline"
               >
                 Next
-                <ArrowRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
 
             {/* Progress bar */}
-            <div className="progress-container">
-              <div className="progress-bar">
+            <div className="mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
-                  className="progress-fill"
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                   style={{
                     width: `${((currentIndex + 1) / flashcards.length) * 100}%`,
                   }}
@@ -414,9 +410,9 @@ const Flashcards = () => {
               Recommended Topics
             </h2>
             <div className="recommendations">
-              {recommendations.map((rec) => (
+              {recommendations.map((rec, index) => (
                 <div
-                  key={rec.topic}
+                  key={`${rec.topic}-${index}`}
                   className="recommendation-card"
                   onClick={() => {
                     setTopic(rec.topic);

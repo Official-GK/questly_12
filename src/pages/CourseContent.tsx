@@ -61,12 +61,13 @@ export default function CourseContent() {
         <div className="lg:col-span-2 space-y-8">
           {showQuiz ? (
             <CourseQuiz
-              questions={currentVideoData.quiz}
+              title={`Quiz: ${currentVideoData.title}`}
+              questions={currentVideoData.quiz?.questions || []}
               onComplete={handleQuizComplete}
             />
           ) : (
             <CourseVideoPlayer
-              videoUrl={currentVideoData.url}
+              videoUrl={currentVideoData.videoUrl}
               onComplete={handleVideoComplete}
             />
           )}

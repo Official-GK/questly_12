@@ -3,7 +3,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
 interface UserContext {
   learningGoals: {
@@ -33,36 +32,49 @@ export async function generateTopicRecommendations(
   userContext: UserContext
 ): Promise<TopicRecommendation[]> {
   try {
-    const prompt = `Generate personalized topic recommendations for a student with the following context:
-    - Primary interests: ${userContext.userInterests.primaryInterests.join(', ')}
-    - Current level: ${userContext.currentLevel}
-    - Learning goals: ${userContext.learningGoals.map(g => g.title).join(', ')}
-    - Struggling with: ${userContext.userInterests.strugglingTopics.join(', ')}
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     
-    Provide 4 topic recommendations in JSON format with:
-    1. id (unique string)
-    2. name (topic name)
-    3. description (brief explanation)
-    4. matchScore (0-100)
-    5. difficulty (easy/medium/hard)
-    6. prerequisites (array of topics)
-    7. estimatedTimeMinutes (number)`;
+    const prompt = `Based on the user's context, generate 5 personalized topic recommendations.
+    User Context:
+    - Current Level: ${userContext.currentLevel}
+    - Primary Interests: ${userContext.userInterests.primaryInterests.join(', ')}
+    - Struggling Topics: ${userContext.userInterests.strugglingTopics.join(', ')}
+    - Strong Topics: ${userContext.userInterests.strongTopics.join(', ')}
+    
+    Return the recommendations in this exact JSON format without any markdown or code blocks:
+    [{"title": "Topic Title", "description": "Topic Description", "matchScore": 85, "difficulty": "medium", "prerequisites": ["topic1", "topic2"], "estimatedTimeMinutes": 30}]`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    // Parse and validate recommendations
-    const recommendations: TopicRecommendation[] = JSON.parse(text);
-    
-    return recommendations.map(rec => ({
-      ...rec,
-      matchScore: Math.min(100, Math.max(0, rec.matchScore)), // Ensure score is 0-100
-      difficulty: rec.difficulty as 'easy' | 'medium' | 'hard'
-    }));
+    try {
+      // Remove any markdown code block markers if present
+      const cleanedText = text.replace(/```json\n|\n```/g, '').trim();
+      const recommendations = JSON.parse(cleanedText);
+      
+      if (!Array.isArray(recommendations) || !recommendations.every(rec => 
+        typeof rec === 'object' &&
+        'title' in rec &&
+        'description' in rec &&
+        'matchScore' in rec &&
+        'difficulty' in rec &&
+        'prerequisites' in rec &&
+        'estimatedTimeMinutes' in rec)) {
+        throw new Error('Invalid recommendation format');
+      }
+      
+      return recommendations.map(rec => ({
+        ...rec,
+        matchScore: Math.min(100, Math.max(0, rec.matchScore)),
+        difficulty: rec.difficulty as 'easy' | 'medium' | 'hard'
+      }));
+    } catch (error) {
+      console.error('Error parsing recommendations:', error);
+      return getDefaultRecommendations(userContext);
+    }
   } catch (error) {
     console.error('Error generating topic recommendations:', error);
-    // Return some default recommendations if AI generation fails
     return getDefaultRecommendations(userContext);
   }
 }
