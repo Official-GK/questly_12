@@ -10,11 +10,18 @@ module.exports = defineConfig({
     }
   },
   build: {
+    outDir: 'dist',
+    sourcemap: true,
+    commonjsOptions: {
+      transformMixedEsModules: true
+    },
     rollupOptions: {
-      external: ['@/components/ui/sonner'],
       output: {
         manualChunks: undefined
       }
     }
+  },
+  optimizeDeps: {
+    include: ['@/components/ui/sonner']
   }
 })
